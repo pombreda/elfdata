@@ -1,0 +1,23 @@
+# depslib dependency file v1.0
+1247353832 source:c:\documents and settings\dmt\Мои документы\borland studio projects\elfdata_svn\sources\elfparser.cpp
+	"elfparser.h"
+
+1247353778 c:\documents and settings\dmt\Мои документы\borland studio projects\elfdata_svn\sources\elfparser.h
+	<windows.h>
+	"binfile.h"
+	"elf.h"
+
+1247143978 c:\documents and settings\dmt\Мои документы\borland studio projects\elfdata_svn\sources\binfile.h
+	<windows.h>
+
+1246612418 c:\documents and settings\dmt\Мои документы\borland studio projects\elfdata_svn\sources\elf.h
+
+1247388428 source:c:\documents and settings\dmt\Мои документы\borland studio projects\elfdata_svn\sources\man.cpp
+	<stdio.h>
+	<conio.h>
+	"elfparser.h"
+	"binfile.h"
+
+1247214046 source:c:\documents and settings\dmt\Мои документы\borland studio projects\elfdata_svn\sources\binfile.cpp
+	"binfile.h"
+
