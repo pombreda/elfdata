@@ -4,6 +4,11 @@
 //******************************************************************************
 
 #include "elfparser.h"
+#include "common.h"
+#include <stdio.h>
+//#include <conio.h>
+//#include <windows.h>
+
 
 ELF_T * OpenElf(const char * FileName)
 {
@@ -56,6 +61,8 @@ int ParseHeader(ELF_T * Elf)
 	{
 		return ELF_PARSER_RETURN_ERROR_READ_FILE;
 	}
+	bigend = ( Elf->Header.e_ident[5] == ELFDATA2MSB );
+	if ( bigend ) switchEndian( &(Elf->Header) );
 	return ELF_PARSER_RETURN_OK;
 }
 
@@ -80,8 +87,10 @@ int ParseProgramHeaders(ELF_T * Elf)
 	{
 		return ELF_PARSER_RETURN_ERROR_READ_FILE;
 	}
+	
 	for(int i=0;i<Elf->Header.e_phnum;i++)
 	{
+		if ( bigend ) switchEndian( &(Elf->ProgramHeaders[i]) );
 		if(Elf->ProgramHeaders[i].p_type == PT_DYNAMIC)
 		{
 			Elf->DynPH = &Elf->ProgramHeaders[i];
@@ -112,7 +121,10 @@ int ParseSectionHeaders(ELF_T * Elf)
 	{
 		return ELF_PARSER_RETURN_ERROR_READ_FILE;
 	}
-
+	for(int i=0;i<Elf->Header.e_shnum;i++)
+	{
+		if ( bigend ) switchEndian( &(Elf->SectionHeaders[i]) );
+	}
 	return ELF_PARSER_RETURN_OK;
 }
 
@@ -141,7 +153,7 @@ int ParseDynamicSegment(ELF_T * Elf)
 	{
 		return ELF_PARSER_RETURN_ERROR_READ_FILE;
 	}
-
+	
 	return ELF_PARSER_RETURN_OK;
 }
 
@@ -187,20 +199,27 @@ int PrepareDynamicSegment(ELF_T * Elf)
 		return ELF_PARSER_RETURN_DYNPH_DOESNT_FOUND;
 	}
 	Elf32_Dyn * tag;
-	int DynTagsCount = Elf->DynPH->p_memsz/sizeof(Elf32_Dyn);
-	for(int i=0;i<DynTagsCount;i++)
+	//Elf->DynTagsCount = 0;
+
+	memset( Elf->DynamicTags, 0, (DT_MAX_TAG+1)*sizeof(Elf32_Word) );
+	for (int i=0; i<Elf->DynPH->p_memsz/sizeof(Elf32_Dyn); i++)
 	{
 		tag = &((Elf32_Dyn*)Elf->DynamicSegment)[i];
-		if(tag->d_tag == DT_NULL) break;    // v, и нужно, хотя хз
+		if ( bigend ) switchEndian( tag );
+		//printf("Tag[%i], d_tag = %i, val = 0x%X (%d)\n", i, tag->d_tag, tag->d_val, tag->d_val );
+		if(tag->d_tag == DT_NULL) break;    // конец
 		if(tag->d_tag == DT_NEEDED)
 		{
 			// загрузка требуемой библиотеки
 		}
-		else
+		//else
 		{
-			Elf->DynamicTags[tag->d_tag] = tag->d_val;
+			if ( tag->d_tag < DT_MAX_TAG+1 )
+				Elf->DynamicTags[tag->d_tag] = tag->d_val;
 		}
+		//Elf->DynTagsCount++;
 	}
+	
 
 	Elf->DynamicSymbolTable = (Elf32_Sym*)( (unsigned long)Elf->DynamicSegment +
 											Elf->DynamicTags[DT_SYMTAB] -
@@ -208,9 +227,9 @@ int PrepareDynamicSegment(ELF_T * Elf)
 
 	Elf->StringTable = (char*)( (unsigned long)Elf->DynamicSegment +
 								Elf->DynamicTags[DT_STRTAB] -
-								Elf->DynPH->p_offset  );
+								Elf->DynPH->p_offset );
 
-
+	//printf( "Elf->StringTable = %d\n", Elf->StringTable );
 
 	return ELF_PARSER_RETURN_OK;
 }

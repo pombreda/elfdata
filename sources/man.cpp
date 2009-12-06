@@ -3,19 +3,64 @@
 
 #include <stdio.h>
 #include <conio.h>
+#include <windows.h>
 #include "elfparser.h"
 #include "binfile.h"
+#include "common.h"
 
+#define ELFDATAVERSION      03
+#define ELFDATAVERSIONSTR   "0.3"
+
+
+// -- GLOBAL VARS LIST ---------------------------------------------------------
+	bool tagShowHelp;
+	bool tagPEH;	// print Elf Header
+	bool tagPDT;	// print Dynamic Tags
+	bool tagSPS;
+	bool tagPST;	// print StringTable
+	bool tagPPH;
+	bool tagPSH;
+	bool tagLOG;
+	bool bigend;
+// -- GLOBAL VARS LIST END -----------------------------------------------------
+
+int Log(char * str)
+{
+	if(!tagLOG) return 1;
+	FILE * f = fopen("log.txt", "a");
+	fprintf(f, "%s", str);
+	fclose(f);
+	return 0;
+}
+
+
+#define HELPMSG "ElfData v."ELFDATAVERSIONSTR"\n"         \
+				"\n"                                      \
+				"-f(filename)    Elf File Path\n"       \
+				"-h              Show this message\n"     \
+				"-log            Log to file\n"           \
+				"-peh            Print ELF header\n" \
+				"-pph            Print program headers\n" \
+				"-psh            Print section headers\n" \
+				"-pst            Print string table\n" \
+				"-sps            Save program segments\n" \
+				"-sss            Save section segments\n"
+
+int PrintfHelp()
+{
+	printf("%s\n", HELPMSG);
+	return 0;
+}
 
 int PrintElfHeader(Elf32_Ehdr * h)
 {
     
 	printf("e_ident     { ");
-				  printf("0 : 0x%.2X\n", h->e_ident[0]);
-	printf("              1 : 0x%.2X '%c'\n", h->e_ident[1], h->e_ident[1]);
-	printf("              2 : 0x%.2X '%c'\n", h->e_ident[2], h->e_ident[2]);
-	printf("              3 : 0x%.2X '%c'\n", h->e_ident[3], h->e_ident[3]);
-	printf("              4 : 0x%.2X ", h->e_ident[4]);
+				  printf("0 : 0x%02X\n", h->e_ident[0]);
+	printf("              1 : 0x%02X '%c'\n", h->e_ident[1], h->e_ident[1]);
+	printf("              2 : 0x%02X '%c'\n", h->e_ident[2], h->e_ident[2]);
+	printf("              3 : 0x%02X '%c'\n", h->e_ident[3], h->e_ident[3]);
+	printf("              4 : 0x%02X ", h->e_ident[4]);
 	switch(h->e_ident[4])
 	{
 		case ELFCLASSNONE:
@@ -38,7 +83,7 @@ int PrintElfHeader(Elf32_Ehdr * h)
 			printf("\n");
 		}
 	}
-	printf("              5 : 0x%.2X ", h->e_ident[5]);
+	printf("              5 : 0x%02X ", h->e_ident[5]);
 	switch(h->e_ident[5])
 	{
 		case ELFDATANONE:
@@ -61,7 +106,7 @@ int PrintElfHeader(Elf32_Ehdr * h)
 			printf("\n");
 		}
 	}
-	printf("              6 : 0x%.2X ", h->e_ident[6]);
+	printf("              6 : 0x%02X ", h->e_ident[6]);
 	switch(h->e_ident[6])
 	{
 		case EV_NONE:
@@ -79,15 +124,15 @@ int PrintElfHeader(Elf32_Ehdr * h)
 			printf("\n");
 		}
 	}
-	printf("              7 : 0x%.2X \n", h->e_ident[7]);
-	printf("              8 : 0x%.2X \n", h->e_ident[8]);
-	printf("              9 : 0x%.2X \n", h->e_ident[9]);
-	printf("              A : 0x%.2X \n", h->e_ident[10]);
-	printf("              B : 0x%.2X \n", h->e_ident[11]);
-	printf("              C : 0x%.2X \n", h->e_ident[12]);
-	printf("              D : 0x%.2X \n", h->e_ident[13]);
-	printf("              E : 0x%.2X \n", h->e_ident[14]);
-	printf("              F : 0x%.2X }\n", h->e_ident[15]);
+	printf("              7 : 0x%02X \n", h->e_ident[7]);
+	printf("              8 : 0x%02X \n", h->e_ident[8]);
+	printf("              9 : 0x%02X \n", h->e_ident[9]);
+	printf("              A : 0x%02X \n", h->e_ident[10]);
+	printf("              B : 0x%02X \n", h->e_ident[11]);
+	printf("              C : 0x%02X \n", h->e_ident[12]);
+	printf("              D : 0x%02X \n", h->e_ident[13]);
+	printf("              E : 0x%02X \n", h->e_ident[14]);
+	printf("              F : 0x%02X }\n", h->e_ident[15]);
 	printf("e_type      : %d\n",h->e_type);
 	printf("e_machine   : %d ",h->e_machine);
 
@@ -97,7 +142,7 @@ int PrintElfHeader(Elf32_Ehdr * h)
 		{                                                   
 			printf("EM_NONE\n");                            
 			break;
-		}                                                   
+		}
 		case EM_M32:                                        
 		{                                                   
 			printf("EM_M32 (AT&T WE 32100)\n");
@@ -166,7 +211,8 @@ int PrintElfHeader(Elf32_Ehdr * h)
 			printf("\n");
 		}
 	}
-	printf("e_entry     : 0x%.8X\n",h->e_entry);
+
+	printf("e_entry     : 0x%08X\n",h->e_entry);
 	printf("e_phoff     : 0x%X (%d)\n",h->e_phoff,h->e_phoff);
 	printf("e_shoff     : 0x%X (%d)\n",h->e_shoff,h->e_shoff);
 	printf("e_flags     : 0x%X\n",h->e_flags);
@@ -258,14 +304,26 @@ int PrintProgramHeader(Elf32_Phdr * h)
 		strcat(cflags, "PF_R");
 	}
 	printf("p_flags  : 0x%X (%s)\n", h->p_flags, cflags);
-	printf("p_memsz  : 0x%X \n", h->p_align);
+	printf("p_align  : 0x%X \n", h->p_align);
 	printf("\n");
+	return 0;
+}
+
+
+int PrintDynTags(ELF_T * Elf)
+{
+	for (int i=0; i<DT_MAX_TAG+1; i++)
+	{
+		//if ( Elf->DynamicTags[i] )
+			printf("Tag[%2d] = 0x%X \t(%d)\n", i, Elf->DynamicTags[i], Elf->DynamicTags[i]);
+	}
 	return 0;
 }
 
 int PrintStringTable(ELF_T * Elf)
 {
-	int m = strlen(Elf->StringTable);
+	//int m = strlen(Elf->StringTable);
+	int m = Elf->DynamicTags[DT_STRSZ];
 	int off=0;
 	char * s;
 	int i=0;                                                      
@@ -273,7 +331,7 @@ int PrintStringTable(ELF_T * Elf)
 	{
 		s = (char*)(Elf->StringTable + off);
 		printf("#%d Index: %d Value: %s\n", i, off, s);
-		off += strlen(s);
+		off += strlen(s)+1;
 		i++;
 	}
 	return 0;
@@ -383,46 +441,132 @@ int PrintSectionHeader(Elf32_Shdr * h, ELF_T * Elf)
 int main(int argc, char* argv[])
 {
 	int r=0;
-	if(argc != 2 || strcmp(argv[1], "")==0)
+	char FileName[256]= "";
+	char Path[256];//, PrPath[256];
+
+	for(int i=1;i<argc;i++)
 	{
-		printf("Error in parameters!\n");
-		getch();
-		return 0;
+		printf("argv[%d = %s\n", i, argv[i]);
+		if(strcmp(argv[i], "")==0)continue;
+		if(strcmp(argv[i], "-h")==0) tagShowHelp = true;
+		if(strcmp(argv[i], "-log")==0) tagLOG = true;
+
+		if(strcmp(argv[i], "-peh")==0) tagPEH = true;
+		if(strcmp(argv[i], "-pdt")==0) tagPDT = true;
+		if(strcmp(argv[i], "-pph")==0) tagPPH = true;
+		if(strcmp(argv[i], "-psh")==0) tagPSH = true;
+		if(strcmp(argv[i], "-pst")==0) tagPST = true;
+
+		if(strcmp(argv[i], "-sps")==0) tagSPS = true;
+		
+		
+		if(strncmp(argv[i], "-f", 2)==0)
+		{
+			sscanf(argv[i], "-f(%s)", FileName);
+		}
 	}
-	else
+
+	if ( !strlen(FileName) )
 	{
-		printf("Loading '%s'...\n", argv[1]);
+		PrintfHelp();
+		return 1;
 	}
-	ELF_T * Elf = OpenElf(argv[1]);
+
+	FileName[strlen(FileName)-1] = '\0';
+
+	strcpy(Path, FileName);
+	for(int i=strlen(Path);i>0;i--)
+	{
+		if(Path[i]=='\\' || Path[i]=='/') break;
+		else Path[i] = '\0';
+	}
+
+	Log("");
+
+	if(tagShowHelp) PrintfHelp();
+
+	ELF_T * Elf = OpenElf(FileName);
+	SetCurrentDirectory(Path);
 	ParseHeader(Elf);
 	Elf32_Ehdr * h = &Elf->Header;
-	printf("HEADER:\n");
-	PrintElfHeader(h);
+	
+
+	if ( tagPEH ) 
+	{
+		printf("HEADER:\n");
+		PrintElfHeader(h);
+	}
+
 
 	ParseProgramHeaders(Elf);
 	Elf32_Phdr * p;
-	for(int i=0;i<Elf->Header.e_phnum;i++)
+	if(tagPPH)
 	{
-		printf("PROGRAM HEADER #%d:\n", i);
-		p = &Elf->ProgramHeaders[i];
-		PrintProgramHeader(p);
+		for(int i=0;i<Elf->Header.e_phnum;i++)
+		{
+			printf("PROGRAM HEADER #%d:\n", i);
+			p = &Elf->ProgramHeaders[i];
+			PrintProgramHeader(p);
+		}
 	}
 
-/*	ParseDynamicSegment(Elf);
+	ParseDynamicSegment(Elf);
 	PrepareDynamicSegment(Elf);
-	PrintStringTable(Elf);     */
+	
+	if ( tagPDT ) 
+	{
+		printf("DINAMIC TAGS:\n");
+		PrintDynTags(Elf);
+	}
+
+	if ( tagPST )
+	{
+		printf("STRING TABLE:\n");
+		PrintStringTable(Elf);
+	}
 
 	ParseSectionHeaders(Elf);
 	Elf32_Shdr * s;
-	for(int i=0;i<Elf->Header.e_shnum;i++)
+	if(tagPSH)
 	{
-		printf("SECTION HEADER #%d:\n", i);
-		s = &Elf->SectionHeaders[i];
-		PrintSectionHeader(s, Elf);
+		for(int i=0;i<Elf->Header.e_shnum;i++)
+		{
+			printf("SECTION HEADER #%d:\n", i);
+			s = &Elf->SectionHeaders[i];
+			PrintSectionHeader(s, Elf);
+		}
 	}
 
+	if(tagSPS)
+	{
+		for(int i=0;i<Elf->Header.e_phnum;i++)
+		{
+			if(true) // Написать всякие проверки
+			{
+				char fn[256];
+				char t[256];
+				FILE * f;
+				void * ptr;
+
+				ptr = malloc(Elf->ProgramHeaders[i].p_memsz);
+				LoadProgramSegment(Elf, &Elf->ProgramHeaders[i], ptr);
+				//ltoa(i, t, 10);
+				sprintf(fn, "ProgramSegment%.2d", i);
+				f = fopen(fn, "w");
+				fwrite(ptr, 1, Elf->ProgramHeaders[i].p_memsz, f);
+				fclose(f);
+				free(ptr);
+				sprintf( t, "PrgramSegment%.2d vaddr=%.8x paddr=%.8x size=%.8x\n",
+						 i,
+						 Elf->ProgramHeaders[i].p_vaddr,
+						 Elf->ProgramHeaders[i].p_paddr,
+						 Elf->ProgramHeaders[i].p_memsz );
+				Log(t);
+			}
+        }
+    }
 	delete Elf;
-	getch();
+	//getch();
 	return 0;
 }
 
